@@ -1,0 +1,70 @@
+version: "3.8"
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.15.0
+    container_name: os
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=ChangeMe_Adm1n!
+      - DISABLE_INSTALL_DEMO_CONFIG=false
+      - plugins.security.disabled=false
+      # allow filesystem snapshots (used in step 3)
+      - path.repo=/snapshots
+    ulimits:
+      memlock: { soft: -1, hard: -1 }
+    ports: ["9200:9200","9600:9600"]
+    volumes:
+      - os-data:/usr/share/opensearch/data         # <- persistent
+      - ./snapshots:/snapshots                     # <- local snapshot folder
+    healthcheck:
+      test: ["CMD","curl","-k","https://localhost:9200"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+
+  dashboards:
+    image: opensearchproject/opensearch-dashboards:2.15.0
+    container_name: osd
+    depends_on: ["opensearch"]
+    ports: ["5601:5601"]
+    volumes:
+      - ./opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
+    environment:
+      - OPENSEARCH_HOSTS=https://opensearch:9200
+
+  # Optional one-shot helper that restores the latest snapshot when the
+  # cluster is empty (no user indices). Enable with `--profile auto-restore`.
+  init-restore:
+    image: curlimages/curl:8.8.0
+    container_name: os-init-restore
+    depends_on: ["opensearch"]
+    environment:
+      - OS_URL=https://opensearch:9200
+      - OS_USER=admin
+      - OS_PASS=ChangeMe_Adm1n!
+      - REPO=local_fs
+    entrypoint: ["/bin/sh","-c"]
+    command: |
+      set -e
+      echo "[init-restore] Waiting for OpenSearch..."
+      i=0; until curl -fsSk -u "$OS_USER:$OS_PASS" "$OS_URL" >/dev/null 2>&1; do i=$$((i+1)); if [ $$i -gt 120 ]; then echo "OpenSearch not ready"; exit 1; fi; sleep 2; done
+      echo "[init-restore] Checking for user indices..."
+      user_count=$(curl -sSk -u "$OS_USER:$OS_PASS" "$OS_URL/_cat/indices?h=index" | grep -v '^\.' | grep -v '^$' | wc -l | tr -d ' ')
+      if [ "$$user_count" -gt 0 ]; then echo "[init-restore] Cluster not empty ($$user_count user indices). Skipping restore."; exit 0; fi
+      echo "[init-restore] Ensuring snapshot repository exists..."
+      code=$(curl -sSk -u "$OS_USER:$OS_PASS" -o /dev/null -w "%{http_code}" "$OS_URL/_snapshot/$REPO" || true)
+      if [ "$$code" != "200" ]; then
+        curl -sSk -u "$OS_USER:$OS_PASS" -H 'Content-Type: application/json' -X PUT "$OS_URL/_snapshot/$REPO" -d '{"type":"fs","settings":{"location":"/snapshots","compress":true}}' >/dev/null
+      fi
+      latest=$(curl -sSk -u "$OS_USER:$OS_PASS" "$OS_URL/_snapshot/$REPO/_all" | grep -o '"snapshot":"[^"]*"' | cut -d: -f2 | tr -d '"' | sort | tail -1)
+      if [ -z "$$latest" ]; then echo "[init-restore] No snapshots found in repo '$REPO'."; exit 0; fi
+      echo "[init-restore] Restoring snapshot '$$latest'..."
+      curl -sSk -u "$OS_USER:$OS_PASS" -H 'Content-Type: application/json' -X POST "$OS_URL/_snapshot/$REPO/$$latest/_restore?wait_for_completion=true" -d '{"indices":"*","include_global_state":true,"ignore_unavailable":true,"include_aliases":true}'
+      echo
+      echo "[init-restore] Restore complete."
+    profiles: ["auto-restore"]
+
+volumes:
+  os-data: {}   # named volume survives `docker compose down`

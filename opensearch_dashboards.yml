@@ -1,0 +1,11 @@
+server.name: opensearch-dashboards
+server.host: 0.0.0.0
+server.ssl.enabled: false
+
+opensearch.hosts: ["https://opensearch:9200"]
+opensearch.username: admin
+opensearch.password: ChangeMe_Adm1n!
+opensearch.ssl.verificationMode: none
+
+# Allow Vega to load images from your thumbnail gateway:
+vis_type_vega.enableExternalUrls: true

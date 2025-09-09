@@ -1,0 +1,9 @@
+# Local OpenSearch snapshots (can be large)
+snapshots/
+
+# Exported saved objects
+dashboards/export.ndjson
+
+# MacOS
+.DS_Store
+
