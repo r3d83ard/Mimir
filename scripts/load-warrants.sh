@@ -38,7 +38,8 @@ create_index() {
         "jurisdiction": {"type": "keyword"},
         "officer": {"type": "keyword"},
         "subject_name": {"type": "keyword"},
-        "subject_address": {"type": "text"},
+        "subject_address": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+        "subject_location": {"type": "geo_point"},
         "tags": {"type": "keyword"},
         "priority": {"type": "integer"},
         "amount": {"type": "double"}
@@ -112,4 +113,3 @@ create_index
 bulk_load
 
 echo "Done. Explore via: $OS_URL/$INDEX/_search?q=*" 
-

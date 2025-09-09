@@ -80,3 +80,34 @@ Sample data: warrants
 - Customize:
   - Count: `./scripts/load-warrants.sh --generate 50`
   - Index: `INDEX=my_warrants ./scripts/load-warrants.sh --generate 30`
+
+Geo search and maps
+-------------------
+
+- The `warrants` index includes `subject_location` (geo_point) derived from the
+  selected jurisdiction with a small jitter. You can query by distance:
+  - `./scripts/search-warrants-geo.sh 37.7749 -122.4194 10km` (SF, 10km radius)
+  - `INDEX=my_warrants ./scripts/search-warrants-geo.sh 34.0522 -118.2437 25km`
+
+- In OpenSearch Dashboards (Maps):
+  - Management > Stack Management > Index Patterns: create one for `warrants*`.
+  - Apps > Maps: create a map, add a Documents layer using `subject_location`.
+  - Style by `status` or `priority` as desired.
+
+Saved map
+---------
+
+- Auto-create a data view for `warrants*` and a saved Map that plots
+  `subject_location` points:
+  - `make create-warrants-map`
+  - Opens at `/app/maps/map/warrants-map` with a basic points layer.
+  - Customize title via `TITLE="My Warrants Map" make create-warrants-map`.
+
+Saved dashboard
+---------------
+
+- Create a saved search, a pie visualization (Warrants by status), and a
+  composed dashboard including the map:
+  - `make create-warrants-dashboard`
+  - Opens at `/app/dashboards#/view/warrants-overview`
+  - Panel types: map, visualization (pie), and saved search (table)

@@ -46,3 +46,15 @@ generate-warrants:
 
 load-warrants:
 	@./scripts/load-warrants.sh
+
+.PHONY: search-geo
+search-geo:
+	@./scripts/search-warrants-geo.sh 37.7749 -122.4194 10km | head -n 80
+
+.PHONY: create-warrants-map
+create-warrants-map:
+	@./scripts/create-warrants-map.sh
+
+.PHONY: create-warrants-dashboard
+create-warrants-dashboard:
+	@./scripts/create-warrants-dashboard.sh
