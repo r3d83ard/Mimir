@@ -69,3 +69,14 @@ Notes
 - Snapshots rely on `path.repo=/snapshots` and the compose bind-mount of `./snapshots`.
 - Dashboards saved objects are stored in OpenSearch; exporting is useful for versioning.
 - If you delete the `os-data` volume, use `make restore` to repopulate from the latest snapshot.
+
+Sample data: warrants
+---------------------
+
+- Generate and load 20 sample warrants into index `warrants`:
+  - `make generate-warrants` (creates `data/warrants.ndjson`, recreates index, loads)
+- Load existing NDJSON again without regenerating:
+  - `make load-warrants`
+- Customize:
+  - Count: `./scripts/load-warrants.sh --generate 50`
+  - Index: `INDEX=my_warrants ./scripts/load-warrants.sh --generate 30`

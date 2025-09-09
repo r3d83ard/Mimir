@@ -39,3 +39,10 @@ import-dash:
 
 status:
 	@curl -sSk -u admin:$$OPENSEARCH_INITIAL_ADMIN_PASSWORD https://localhost:9200 | jq . || curl -sSk https://localhost:9200
+
+.PHONY: generate-warrants load-warrants
+generate-warrants:
+	@./scripts/load-warrants.sh --generate 20
+
+load-warrants:
+	@./scripts/load-warrants.sh
