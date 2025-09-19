@@ -81,6 +81,16 @@ Sample data: warrants
   - Count: `./scripts/load-warrants.sh --generate 50`
   - Index: `INDEX=my_warrants ./scripts/load-warrants.sh --generate 30`
 
+Data model highlights
+---------------------
+- Location cities: Chattanooga (TN), Dalton (GA), Atlanta (GA) with jittered `subject_location` points.
+- Intermixed issuing agencies: TN and GA agencies regardless of city.
+- New fields: `city`, `state`, `issuing_state`, `issuing_agency`, `crime`, `crime_category`, `severity`.
+- Severity correlation:
+  - High: violent crimes (e.g., homicide, aggravated assault, armed robbery)
+  - Medium: property crimes (e.g., burglary, larceny, fraud)
+  - Low: low-level drug/misc (e.g., possession, trespassing)
+
 Geo search and maps
 -------------------
 

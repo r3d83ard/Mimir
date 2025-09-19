@@ -18,7 +18,13 @@ titles = [
     "Inspection Warrant",
 ]
 
-jurisdictions = ["CA-LA", "CA-SF", "NY-NYC", "TX-AUS", "WA-SEA", "IL-CHI", "FL-MIA", "MA-BOS"]
+# Focus on Chattanooga (TN), Dalton (GA), and Atlanta (GA)
+cities = {
+    "TN-CHA": {"city": "Chattanooga", "state": "TN", "coords": (35.0456, -85.3097)},
+    "GA-DAL": {"city": "Dalton",      "state": "GA", "coords": (34.7698, -84.9702)},
+    "GA-ATL": {"city": "Atlanta",      "state": "GA", "coords": (33.7490, -84.3880)},
+}
+jurisdictions = list(cities.keys())
 statuses = ["pending", "active", "executed", "revoked", "expired"]
 officers = [
     "Det. Sarah Collins",
@@ -38,19 +44,41 @@ streets = [
 ]
 tags_pool = ["narcotics", "fraud", "theft", "homicide", "cyber", "financial", "fugitives", "wiretap"]
 
-now = datetime.utcnow()
+# Crime categories and severity mapping
+violent_crimes = [
+    "homicide", "aggravated assault", "armed robbery", "kidnapping", "sexual assault"
+]
+property_crimes = [
+    "burglary", "larceny", "fraud", "auto theft", "vandalism"
+]
+low_level_crimes = [
+    "drug possession", "disorderly conduct", "trespassing", "public intoxication", "traffic violation"
+]
 
-# Base coordinates for each jurisdiction (approx city centers)
-jurisdiction_coords = {
-    "CA-LA": (34.0522, -118.2437),   # Los Angeles
-    "CA-SF": (37.7749, -122.4194),   # San Francisco
-    "NY-NYC": (40.7128, -74.0060),   # New York
-    "TX-AUS": (30.2672, -97.7431),   # Austin
-    "WA-SEA": (47.6062, -122.3321),  # Seattle
-    "IL-CHI": (41.8781, -87.6298),   # Chicago
-    "FL-MIA": (25.7617, -80.1918),   # Miami
-    "MA-BOS": (42.3601, -71.0589),   # Boston
-}
+def pick_crime():
+    # Weighted distribution: High 20%, Medium 50%, Low 30%
+    r = random.random()
+    if r < 0.2:
+        crime = random.choice(violent_crimes)
+        severity = "High"
+        priority = 5
+        amount = round(random.uniform(10000.0, 100000.0), 2)
+        category = "violent"
+    elif r < 0.7:
+        crime = random.choice(property_crimes)
+        severity = "Medium"
+        priority = 3
+        amount = round(random.uniform(2000.0, 20000.0), 2)
+        category = "property"
+    else:
+        crime = random.choice(low_level_crimes)
+        severity = "Low"
+        priority = 1
+        amount = round(random.uniform(100.0, 2000.0), 2)
+        category = "low-level"
+    return crime, severity, priority, amount, category
+
+now = datetime.utcnow()
 
 def rand_date(start_days_ago=120, span_days=180):
     start = now - timedelta(days=start_days_ago)
@@ -65,12 +93,25 @@ def build_doc():
     amount = round(random.uniform(500.0, 50000.0), 2)
 
     j = random.choice(jurisdictions)
-    base_lat, base_lon = jurisdiction_coords[j]
-    # small jitter ~ up to ~1.5km
-    jitter_lat = (random.random() - 0.5) * 0.03
-    jitter_lon = (random.random() - 0.5) * 0.03
+    city_info = cities[j]
+    base_lat, base_lon = city_info["coords"]
+    # small jitter ~ up to ~3km
+    jitter_lat = (random.random() - 0.5) * 0.06
+    jitter_lon = (random.random() - 0.5) * 0.06
     lat = round(base_lat + jitter_lat, 6)
     lon = round(base_lon + jitter_lon, 6)
+
+    crime, severity, pri, amount, category = pick_crime()
+
+    # Issuing agency can be from TN or GA, intermix across cities
+    issuers = [
+        ("TN", "Chattanooga PD"),
+        ("TN", "Tennessee Highway Patrol"),
+        ("GA", "Atlanta PD"),
+        ("GA", "Dalton PD"),
+        ("GA", "Georgia State Patrol"),
+    ]
+    issuing_state, issuing_agency = random.choice(issuers)
 
     return {
         "warrant_id": str(uuid.uuid4()),
@@ -80,11 +121,18 @@ def build_doc():
         "issue_date": issue,
         "expiry_date": expiry.isoformat() + "Z",
         "jurisdiction": j,
+        "city": city_info["city"],
+        "state": city_info["state"],
         "officer": random.choice(officers),
         "subject_name": random.choice(subjects),
         "subject_address": random.choice(streets),
         # Geo point usable in filters, distance queries, and Maps
         "subject_location": {"lat": lat, "lon": lon},
+        "issuing_state": issuing_state,
+        "issuing_agency": issuing_agency,
+        "crime": crime,
+        "severity": severity,
+        "crime_category": category,
         "tags": random.sample(tags_pool, k=random.randint(1, 3)),
         "priority": pri,
         "amount": amount

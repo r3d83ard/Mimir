@@ -11,13 +11,13 @@ EXPORT_FILE=${EXPORT_FILE:-dashboards/export.ndjson}
 mkdir -p "$(dirname "$EXPORT_FILE")"
 
 curl_dash() {
-  curl -sS -u "$OS_USER:$OS_PASS" -H 'kbn-xsrf: true' "$@"
+  curl -sS -u "$OS_USER:$OS_PASS" -H 'osd-xsrf: true' "$@"
 }
 
 wait_ready() {
   echo -n "Waiting for Dashboards at $DASH_URL ..."
   for i in {1..120}; do
-    if curl -fsS "$DASH_URL/api/status" >/dev/null 2>&1; then
+    if curl -fsS -u "$OS_USER:$OS_PASS" "$DASH_URL/api/status" >/dev/null 2>&1; then
       echo " ready"; return 0
     fi
     echo -n "."; sleep 2
@@ -49,7 +49,7 @@ import_all() {
     exit 1
   fi
   echo "Importing saved objects from $EXPORT_FILE (overwrite=true)"
-  curl_dash -H 'kbn-xsrf: true' \
+  curl_dash \
     -F "file=@$EXPORT_FILE" \
     "$DASH_URL/api/saved_objects/_import?overwrite=true"
   echo
@@ -72,4 +72,3 @@ case "${1:-}" in
   import) import_all ;;
   *) usage; exit 1 ;;
 esac
-

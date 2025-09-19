@@ -6,16 +6,17 @@ OS_USER=${OS_USER:-admin}
 OS_PASS=${OS_PASS:-ChangeMe_Adm1n!}
 INDEX_PATTERN_TITLE=${INDEX_PATTERN_TITLE:-warrants*}
 TIME_FIELD=${TIME_FIELD:-issue_date}
+DATA_VIEW_ID=${DATA_VIEW_ID:-warrants-dv}
 
 MAP_ID=${MAP_ID:-warrants-map}
 SEARCH_ID=${SEARCH_ID:-warrants-search}
-VIZ_ID=${VIZ_ID:-warrants-by-status}
+VIZ_ID=${VIZ_ID:-warrants-by-severity}
 DASH_ID=${DASH_ID:-warrants-overview}
 
 wait_ready() {
   echo -n "Waiting for Dashboards at $DASH_URL ..."
   for i in {1..120}; do
-    if curl -fsS "$DASH_URL/api/status" >/dev/null 2>&1; then echo " ready"; return 0; fi
+    if curl -fsS -u "$OS_USER:$OS_PASS" "$DASH_URL/api/status" >/dev/null 2>&1; then echo " ready"; return 0; fi
     echo -n "."; sleep 2
   done
   echo "\nTimeout waiting for $DASH_URL" >&2
@@ -23,42 +24,16 @@ wait_ready() {
 }
 
 curl_dash() {
-  curl -sS -u "$OS_USER:$OS_PASS" -H 'kbn-xsrf: true' "$@"
+  curl -sS -u "$OS_USER:$OS_PASS" -H 'osd-xsrf: true' "$@"
 }
 
 ensure_data_view() {
-  echo "Ensuring data view '$INDEX_PATTERN_TITLE' exists"
-  # Try create
-  local res code id
-  res=$(curl_dash -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
-    -X POST "$DASH_URL/api/index_patterns/index_pattern" \
-    -d "{\"index_pattern\":{\"title\":\"$INDEX_PATTERN_TITLE\",\"timeFieldName\":\"$TIME_FIELD\"}}" || true)
-  if [[ "$res" == "409" ]]; then
-    # Find existing
-    local find
-    find=$(curl_dash "$DASH_URL/api/saved_objects/_find?type=index-pattern&search_fields=title&search=$INDEX_PATTERN_TITLE")
-    if command -v jq >/dev/null 2>&1; then
-      id=$(printf '%s' "$find" | jq -r '.saved_objects[0].id')
-    else
-      id=$(printf '%s' "$find" | sed -n 's/.*"id":"\([^"]\+\)".*/\1/p' | head -n1)
-    fi
-  else
-    # Read created id
-    local body
-    body=$(curl_dash -H 'Content-Type: application/json' \
-      -X POST "$DASH_URL/api/index_patterns/index_pattern" \
-      -d "{\"index_pattern\":{\"title\":\"$INDEX_PATTERN_TITLE\",\"timeFieldName\":\"$TIME_FIELD\"}}")
-    if command -v jq >/dev/null 2>&1; then
-      id=$(printf '%s' "$body" | jq -r '.index_pattern.id')
-    else
-      id=$(printf '%s' "$body" | sed -n 's/.*"id":"\([^"]\+\)".*/\1/p' | head -n1)
-    fi
-  fi
-  if [[ -z "${id:-}" || "$id" == "null" ]]; then
-    echo "Failed to get data view id" >&2
-    exit 1
-  fi
-  echo "$id"
+  echo "Ensuring data view '$INDEX_PATTERN_TITLE' exists as id $DATA_VIEW_ID"
+  # Create/overwrite via saved_objects API
+  curl_dash -H 'Content-Type: application/json' \
+    -X POST "$DASH_URL/api/saved_objects/index-pattern/$DATA_VIEW_ID?overwrite=true" \
+    -d "{\"attributes\":{\"title\":\"$INDEX_PATTERN_TITLE\",\"timeFieldName\":\"$TIME_FIELD\"}}" >/dev/null
+  echo "$DATA_VIEW_ID"
 }
 
 ensure_map() {
@@ -106,19 +81,19 @@ create_viz() {
 import json, os
 dv=os.environ['DV']
 vis_state={
-  "title": "Warrants by status",
+  "title": "Warrants by severity",
   "type": "pie",
   "aggs": [
     {"id":"1","enabled":True,"type":"count","schema":"metric","params":{}},
     {"id":"2","enabled":True,"type":"terms","schema":"segment","params":{
-      "field":"status","size":10,"order":"desc","orderBy":"1"
+      "field":"severity","size":10,"order":"desc","orderBy":"1"
     }}
   ],
   "params": {"isDonut": True, "type": "pie", "legendPosition": "right"}
 }
 body={
   "attributes": {
-    "title": "Warrants by status",
+    "title": "Warrants by severity",
     "visState": json.dumps(vis_state),
     "kibanaSavedObjectMeta": {
       "searchSourceJSON": json.dumps({"index": dv, "query": {"language":"kuery","query":""}, "filter": []})
@@ -199,4 +174,3 @@ ensure_map
 DV="$DV_ID" create_search "$DV_ID"
 DV="$DV_ID" create_viz "$DV_ID"
 MAP_ID="$MAP_ID" VIZ_ID="$VIZ_ID" SEARCH_ID="$SEARCH_ID" create_dashboard
-

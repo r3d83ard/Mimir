@@ -36,8 +36,8 @@ services:
     environment:
       - OPENSEARCH_HOSTS=https://opensearch:9200
     healthcheck:
-      test: ["CMD-SHELL", 
-        "/usr/share/opensearch-dashboards/node/bin/node -e 'const http=require(\"http\");const opts={host:\"localhost\",port:5601,path:\"/api/status\"};const req=http.request(opts,res=>{let d=\"\";res.on(\"data\",c=>d+=c);res.on(\"end\",()=>{try{const j=JSON.parse(d);const lvl=(j.status&&j.status.overall&&j.status.overall.level)||(j.overall&&j.overall.state);if(lvl===\"available\"||lvl===\"green\"){process.exit(0)}console.error(\"status:\",lvl);process.exit(1)}catch(e){console.error(\"parse\",e);process.exit(1)}})});req.on(\"error\",()=>process.exit(1));req.end();'"
+      test: ["CMD-SHELL",
+        "/usr/share/opensearch-dashboards/node/bin/node -e 'const http=require(\"http\");const auth=\"Basic YWRtaW46Q2hhbmdlTWVfQWRtMW4h\";const opts={host:\"localhost\",port:5601,path:\"/api/status\",headers:{Authorization:auth}};const req=http.request(opts,res=>{let d=\"\";res.on(\"data\",c=>d+=c);res.on(\"end\",()=>{try{const j=JSON.parse(d);const state=(j&&j.status&&j.status.overall&&j.status.overall.state)||\"\";if(state.toLowerCase()==='green'||state.toLowerCase()==='available'){process.exit(0)}console.error(\"state:\",state);process.exit(1)}catch(e){console.error(\"parse\",e);process.exit(1)}})});req.on(\"error\",()=>process.exit(1));req.end();'"
       ]
       interval: 10s
       timeout: 5s

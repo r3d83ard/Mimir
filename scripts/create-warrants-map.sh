@@ -11,11 +11,12 @@ TITLE=${TITLE:-Warrants — Subject Locations}
 INDEX_PATTERN_TITLE=${INDEX_PATTERN_TITLE:-warrants*}
 TIME_FIELD=${TIME_FIELD:-issue_date}
 MAP_ID=${MAP_ID:-warrants-map}
+DATA_VIEW_ID=${DATA_VIEW_ID:-warrants-dv}
 
 wait_ready() {
   echo -n "Waiting for Dashboards at $DASH_URL ..."
   for i in {1..120}; do
-    if curl -fsS "$DASH_URL/api/status" >/dev/null 2>&1; then echo " ready"; return 0; fi
+    if curl -fsS -u "$OS_USER:$OS_PASS" "$DASH_URL/api/status" >/dev/null 2>&1; then echo " ready"; return 0; fi
     echo -n "."; sleep 2
   done
   echo "\nTimeout waiting for $DASH_URL" >&2
@@ -23,27 +24,16 @@ wait_ready() {
 }
 
 curl_dash() {
-  curl -sS -u "$OS_USER:$OS_PASS" -H 'kbn-xsrf: true' "$@"
+  curl -sS -u "$OS_USER:$OS_PASS" -H 'osd-xsrf: true' "$@"
 }
 
 create_data_view() {
-  echo "Creating data view '$INDEX_PATTERN_TITLE' (time field: $TIME_FIELD)"
-  local res
-  res=$(curl_dash -H 'Content-Type: application/json' \
-    -X POST "$DASH_URL/api/index_patterns/index_pattern" \
-    -d "{\"index_pattern\":{\"title\":\"$INDEX_PATTERN_TITLE\",\"timeFieldName\":\"$TIME_FIELD\"}}")
-  # Extract id; fall back to a naive grep if jq not present
-  local id
-  if command -v jq >/dev/null 2>&1; then
-    id=$(printf '%s' "$res" | jq -r '.index_pattern.id')
-  else
-    id=$(printf '%s' "$res" | sed -n 's/.*"id":"\([^"]\+\)".*/\1/p' | head -n1)
-  fi
-  if [[ -z "$id" ]]; then
-    echo "Failed to create data view (response: $res)" >&2
-    exit 1
-  fi
-  echo "$id"
+  echo "Creating data view '$INDEX_PATTERN_TITLE' (time field: $TIME_FIELD) as id $DATA_VIEW_ID"
+  # Use saved_objects API directly (works with OSD 2.x)
+  curl_dash -H 'Content-Type: application/json' \
+    -X POST "$DASH_URL/api/saved_objects/index-pattern/$DATA_VIEW_ID?overwrite=true" \
+    -d "{\"attributes\":{\"title\":\"$INDEX_PATTERN_TITLE\",\"timeFieldName\":\"$TIME_FIELD\"}}" >/dev/null
+  echo "$DATA_VIEW_ID"
 }
 
 create_map() {

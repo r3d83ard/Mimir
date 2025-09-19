@@ -42,7 +42,7 @@ status:
 
 .PHONY: generate-warrants load-warrants
 generate-warrants:
-	@./scripts/load-warrants.sh --generate 20
+	@./scripts/load-warrants.sh --generate 1000
 
 load-warrants:
 	@./scripts/load-warrants.sh
