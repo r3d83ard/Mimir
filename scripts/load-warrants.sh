@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_ROOT=$(dirname "$SCRIPT_DIR")
+
 INDEX=${INDEX:-warrants}
-FILE=${FILE:-data/warrants.ndjson}
+FILE=${FILE:-$PROJECT_ROOT/data/warrants.ndjson}
 OS_URL=${OS_URL:-https://localhost:9200}
 OS_USER=${OS_USER:-admin}
 OS_PASS=${OS_PASS:-ChangeMe_Adm1n!}

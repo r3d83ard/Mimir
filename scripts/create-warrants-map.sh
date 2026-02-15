@@ -1,6 +1,72 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# These variables are expected to be set in the environment by the calling script
+# or default to values if not set.
+DASH_URL=${DASH_URL:-http://localhost:5601}
+OS_USER=${OS_USER:-admin}
+OS_PASS=${OS_PASS:-ChangeMe_Adm1n!}
+MAP_ID=${MAP_ID:-warrants-map}
+DATA_VIEW_ID=${DV} # The parent script passes DV_ID as DV environment variable
+
+
+# Helper function to call the Dashboards API
+curl_dash() {
+  curl -sS -u "$OS_USER:$OS_PASS" -H 'osd-xsrf: true' "$@"
+}
+
+payload=$(python3 - <<PY
+import json, os
+
+MAP_ID = os.environ['MAP_ID']
+DATA_VIEW_ID = os.environ['DATA_VIEW_ID']
+
+# Minimal map object payload. Assumes a basic map that can be linked to a data view.
+# The actual map configuration (layers, styling, etc.) would be much more complex.
+# This assumes the map will be configured to use the specified data view.
+body={
+  "attributes": {
+    "title": "Warrants Map",
+    "description": "Map displaying warrants data",
+    # This 'mapStateJSON' is a placeholder. A real map object would have
+    # detailed layer configurations, basemap settings, and data mappings.
+    # Without more context or a reference, a minimal working structure is assumed.
+    "mapStateJSON": json.dumps({
+      "timeFilters": {
+        "from": "now-24h",
+        "to": "now"
+      },
+      "query": {
+        "query": "",
+        "language": "kuery"
+      },
+      "filters": []
+    }),
+    "kibanaSavedObjectMeta": {
+      "searchSourceJSON": json.dumps({
+        "index": DATA_VIEW_ID,
+        "query": {"language":"kuery","query":""},
+        "filter": []
+      })
+    }
+  },
+  "references": [
+    {"type":"index-pattern","name":"kibanaSavedObjectMeta.searchSourceJSON.index","id": DATA_VIEW_ID}
+  ]
+}
+print(json.dumps(body))
+PY
+)
+
+curl_dash -H 'Content-Type: application/json' \
+  -X POST "$DASH_URL/api/saved_objects/map/$MAP_ID?overwrite=true" \
+  -d "$payload" >/dev/null
+
+echo "Saved map ($MAP_ID) created successfully."
+
+#!/usr/bin/env bash
+set -euo pipefail
+
 # Create a Data View for warrants* and a Maps saved object that plots
 # points from field `subject_location`.
 
